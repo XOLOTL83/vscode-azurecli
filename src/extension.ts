@@ -307,7 +307,7 @@ function allMatches(regex: RegExp, string: string, group: number) {
     }
 }
 
-var replacing = false;
+let replacing = false;
 function replaceContent(editor: TextEditor, content: string) {
     const document = editor.document;
     replacing = true;
