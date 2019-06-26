@@ -8,7 +8,6 @@ import { HoverProvider, Hover, SnippetString, StatusBarAlignment, StatusBarItem,
 import { AzService, CompletionKind, Arguments, Status } from './azService';
 import { parse, findNode } from './parser';
 import { exec } from './utils';
-import { AzureCliToolsSettings } from './configurationSettings';
 
 export function activate(context: ExtensionContext) {
     const azService = new AzService(azNotFound);
@@ -146,8 +145,6 @@ class RunLineInTerminal {
     }
 }
 
-const elegantSpinner = require('elegant-spinner');
-
 class RunLineInEditor {
 
     private resultDocument: TextDocument | undefined;
@@ -155,44 +152,29 @@ class RunLineInEditor {
     private queryEnabled = false;
     private query: string | undefined;
     private disposables: Disposable[] = [];
-    private readonly settings: AzureCliToolsSettings = AzureCliToolsSettings.Instance;
-    private runStatusBarItem: StatusBarItem;
-    private interval!: NodeJS.Timer;
-    private spinner = elegantSpinner();
-
+    
     constructor(private status: StatusBarInfo) {
         this.disposables.push(commands.registerTextEditorCommand('ms-azurecli.toggleLiveQuery', editor => this.toggleQuery(editor)));
         this.disposables.push(commands.registerTextEditorCommand('ms-azurecli.runLineInEditor', editor => this.run(editor)));
         this.disposables.push(workspace.onDidCloseTextDocument(document => this.close(document)));
         this.disposables.push(workspace.onDidChangeTextDocument(event => this.change(event)));
-
-        this.runStatusBarItem = window.createStatusBarItem(StatusBarAlignment.Left);
     }
 
     private run(source: TextEditor) {
-        var t0 = Date.now();
-        this.interval = setInterval(() => {
-            this.runStatusBarItem.text = `Waiting for response ${this.spinner()}`;
-        }, 50);
-        this.runStatusBarItem.show();
 
         this.parsedResult = undefined;
         this.query = undefined; // TODO
         const cursor = source.selection.active;
         const line = source.document.lineAt(cursor).text;
-        const isPlainText = (line.indexOf('--query') !== -1) || (line.indexOf('-h') !== -1) || (line.indexOf('--help') !== -1);
         return this.findResultDocument()
             .then(document => window.showTextDocument(document, ViewColumn.Two, true))
             .then(target => replaceContent(target, JSON.stringify({ 'Running command': line }) + '\n')
                 .then(() => exec(line))
                 .then(({ stdout }) => stdout, ({ stdout, stderr }) => JSON.stringify({ stderr, stdout }, null, '    '))
-                .then(content => {
-                    replaceContent(target, content, isPlainText ? 'plaintext' : '')
-                        .then(() => this.parsedResult = JSON.parse(content))
-                        .then(undefined, err => {});
-                    clearInterval(this.interval);
-                    this.runStatusBarItem.text = 'AZ CLI command executed in ' + (Date.now() - t0) + ' milliseconds.';
-                })
+                .then(content => replaceContent(target, content)
+                    .then(() => this.parsedResult = JSON.parse(content))
+                    .then(undefined, err => {})
+                )
             )
             .then(undefined, console.error);
     }
@@ -205,10 +187,6 @@ class RunLineInEditor {
     }
 
     private findResultDocument() {
-        if (this.settings.showResponseInDifferentTab) {
-            return workspace.openTextDocument({ language: 'json' })
-                .then(document => this.resultDocument = document); 
-        }
         if (this.resultDocument) {
             return Promise.resolve(this.resultDocument);
         }
@@ -217,7 +195,11 @@ class RunLineInEditor {
     }
 
     private close(document: TextDocument) {
-        if (document === this.resultDocument) {
+        if (replacing) {
+            // this is a kludge because changing the language causes a close() and add()
+            replacing = false;
+        }
+        else if (document === this.resultDocument) {
             this.resultDocument = undefined;
         }
     }
@@ -263,7 +245,6 @@ class RunLineInEditor {
 
     dispose() {
         this.disposables.forEach(disposable => disposable.dispose());
-        this.runStatusBarItem.dispose();
     }
 }
 
@@ -326,11 +307,12 @@ function allMatches(regex: RegExp, string: string, group: number) {
     }
 }
 
-function replaceContent(editor: TextEditor, content: string, documentLanguage: string = '') {
+var replacing = false;
+function replaceContent(editor: TextEditor, content: string) {
     const document = editor.document;
-    if (documentLanguage) {
-        languages.setTextDocumentLanguage(document, documentLanguage);
-    }
+    replacing = true;
+    var isJson = content.startsWith('{') || content.startsWith('[');
+    languages.setTextDocumentLanguage(document, isJson ? 'json' : 'plaintext');
     const all = new Range(new Position(0, 0), document.lineAt(document.lineCount - 1).range.end);
     return editor.edit(builder => builder.replace(all, content))
         .then(() => editor.selections = [new Selection(0, 0, 0, 0)]);
