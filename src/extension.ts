@@ -21,27 +21,16 @@ export function activate(context: ExtensionContext) {
     context.subscriptions.push(commands.registerCommand('ms-azurecli.installAzureCLI', installAzureCLI));
 
     // register a content provider for the azcli scheme
-	const myScheme = 'azcli';
-	const myProvider = new class implements TextDocumentContentProvider {
-		// emitter and its event
+    const azCliScheme = 'azcli';
+	const azCliProvider = new class implements TextDocumentContentProvider {
 		onDidChangeEmitter = new EventEmitter<Uri>();
 		onDidChange = this.onDidChangeEmitter.event;
 
 		provideTextDocumentContent(uri: Uri): string {
-			return uri.path;
+			return '';
 		}
 	}
-    context.subscriptions.push(workspace.registerTextDocumentContentProvider(myScheme, myProvider));
-
-    // register a command that opens an azcli document
-	// context.subscriptions.push(commands.registerCommand('azcli.openDocument', async () => {
-    //     let uri = Uri.parse('cowsay:' + what);
-    //     let doc = await workspace.openTextDocument(uri); // calls back into the provider
-    //     await window.showTextDocument(doc, { preview: false });
-	// }));
-    
-    //return workspace.openTextDocument({ language: 'json' })
-    //        .then(document => this.resultDocument = document);
+    context.subscriptions.push(workspace.registerTextDocumentContentProvider(azCliScheme, azCliProvider));
 }
 
 const completionKinds: Record<CompletionKind, CompletionItemKind> = {
@@ -223,8 +212,8 @@ class RunLineInEditor {
                 .then(() => exec(line))
                 .then(({ stdout }) => stdout, ({ stdout, stderr }) => JSON.stringify({ stderr, stdout }, null, '    '))
                 .then(content => replaceContent(target, content)
-                        .then(() => this.parsedResult = JSON.parse(content))
-                        .then(undefined, err => {})
+                    .then(() => this.parsedResult = JSON.parse(content))
+                    .then(undefined, err => {})
                 )
                 .then(() => this.commandFinished(t0))
             )
@@ -253,15 +242,25 @@ class RunLineInEditor {
         this.updateResult();
     }
 
-    private findResultDocument() {
-        const showResultInNewEditor = workspace.getConfiguration('azureCLI', null).get<boolean>('showResultInNewEditor', false)
+    private index: number = 0;
+    private async findResultDocument() {
+        const showResultInNewEditor = workspace.getConfiguration('azureCLI', null).get<boolean>('showResultInNewEditor', false);
         if (this.resultDocument && !showResultInNewEditor) {
             return Promise.resolve(this.resultDocument);
         }
 
-        //return workspace.openTextDocument({ language: 'json' })
-        return workspace.openTextDocument('azcli')
-            .then(document => this.resultDocument = document);
+        const openResultAsReadOnly = workspace.getConfiguration('azureCLI', null).get<boolean>('openResultAsReadOnly', false);
+        if (openResultAsReadOnly)
+        {
+            this.index += 1;
+            const document = await workspace.openTextDocument(Uri.parse('azcli:' + this.index.toString()));
+            return this.resultDocument = document;
+        }
+        else
+        {
+            const document_1 = await workspace.openTextDocument({ language: 'json' });
+            return this.resultDocument = document_1;
+        }
     }
 
     private close(document: TextDocument) {
@@ -373,7 +372,7 @@ function allMatches(regex: RegExp, string: string, group: number) {
     }
 }
 
-function replaceContent(editor: TextEditor, content: string, documentLanguage: string = '') {
+function replaceContent(editor: TextEditor, content: string, documentLanguage: string = 'json') {
     const document = editor.document;
     if (documentLanguage) {
         languages.setTextDocumentLanguage(document, documentLanguage);
