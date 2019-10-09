@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import * as jmespath from 'jmespath';
-import { HoverProvider, Hover, SnippetString, StatusBarAlignment, StatusBarItem, ExtensionContext, TextDocument, TextDocumentChangeEvent, Disposable, TextEditor, Selection, languages, commands, Range, ViewColumn, Position, CancellationToken, ProviderResult, CompletionItem, CompletionList, CompletionItemKind, CompletionItemProvider, window, workspace, env, Uri, WorkspaceEdit } from 'vscode';
+import { HoverProvider, Hover, SnippetString, StatusBarAlignment, StatusBarItem, ExtensionContext, TextDocument, TextDocumentChangeEvent, Disposable, TextEditor, Selection, languages, commands, Range, ViewColumn, Position, CancellationToken, ProviderResult, CompletionItem, CompletionList, CompletionItemKind, CompletionItemProvider, window, workspace, env, Uri, WorkspaceEdit, TextDocumentContentProvider, EventEmitter } from 'vscode';
 
 import { AzService, CompletionKind, Arguments, Status } from './azService';
 import { parse, findNode } from './parser';
@@ -19,6 +19,29 @@ export function activate(context: ExtensionContext) {
     context.subscriptions.push(new RunLineInTerminal());
     context.subscriptions.push(new RunLineInEditor(status));
     context.subscriptions.push(commands.registerCommand('ms-azurecli.installAzureCLI', installAzureCLI));
+
+    // register a content provider for the azcli scheme
+	const myScheme = 'azcli';
+	const myProvider = new class implements TextDocumentContentProvider {
+		// emitter and its event
+		onDidChangeEmitter = new EventEmitter<Uri>();
+		onDidChange = this.onDidChangeEmitter.event;
+
+		provideTextDocumentContent(uri: Uri): string {
+			return uri.path;
+		}
+	}
+    context.subscriptions.push(workspace.registerTextDocumentContentProvider(myScheme, myProvider));
+
+    // register a command that opens an azcli document
+	// context.subscriptions.push(commands.registerCommand('azcli.openDocument', async () => {
+    //     let uri = Uri.parse('cowsay:' + what);
+    //     let doc = await workspace.openTextDocument(uri); // calls back into the provider
+    //     await window.showTextDocument(doc, { preview: false });
+	// }));
+    
+    //return workspace.openTextDocument({ language: 'json' })
+    //        .then(document => this.resultDocument = document);
 }
 
 const completionKinds: Record<CompletionKind, CompletionItemKind> = {
@@ -235,7 +258,9 @@ class RunLineInEditor {
         if (this.resultDocument && !showResultInNewEditor) {
             return Promise.resolve(this.resultDocument);
         }
-        return workspace.openTextDocument({ language: 'json' })
+
+        //return workspace.openTextDocument({ language: 'json' })
+        return workspace.openTextDocument('azcli')
             .then(document => this.resultDocument = document);
     }
 
