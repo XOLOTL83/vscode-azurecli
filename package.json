@@ -98,6 +98,12 @@
           "default": false,
           "scope": "resource",
           "description": "Controls whether showing the result from running an Azure CLI command in an editor should always create a new editor."
+        },
+        "azureCLI.openResultAsReadOnly": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Controls whether showing the result from running an Azure CLI command should be in a read only editor."
         }
       }
     },
