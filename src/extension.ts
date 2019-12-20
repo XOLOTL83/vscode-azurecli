@@ -31,6 +31,8 @@ export function activate(context: ExtensionContext) {
 		}
 	}
     context.subscriptions.push(workspace.registerTextDocumentContentProvider(azCliScheme, azCliProvider));
+
+    //workspace.registerFileSystemProvider('gitfs', workspace., { isReadonly: true, isCaseSensitive: true })
 }
 
 const completionKinds: Record<CompletionKind, CompletionItemKind> = {
@@ -206,7 +208,7 @@ class RunLineInEditor {
         this.query = undefined; // TODO
         const cursor = source.selection.active;
         const line = source.document.lineAt(cursor).text;
-        return this.findResultDocument()
+        return this.findResultDocument(line)  // todo: can we limit max tab width??? (Verbosity of Title property?)
             .then(document => window.showTextDocument(document, ViewColumn.Two, true))
             .then(target => replaceContent(target, JSON.stringify({ 'Running command': line }) + '\n')
                 .then(() => exec(line))
@@ -243,7 +245,7 @@ class RunLineInEditor {
     }
 
     private index: number = 0;
-    private async findResultDocument() {
+    private async findResultDocument(title: string = '') {
         const showResultInNewEditor = workspace.getConfiguration('azureCLI', null).get<boolean>('showResultInNewEditor', false);
         if (this.resultDocument && !showResultInNewEditor) {
             return Promise.resolve(this.resultDocument);
@@ -252,14 +254,16 @@ class RunLineInEditor {
         const openResultAsReadOnly = workspace.getConfiguration('azureCLI', null).get<boolean>('openResultAsReadOnly', false);
         if (openResultAsReadOnly)
         {
-            this.index += 1;
-            const document = await workspace.openTextDocument(Uri.parse('azcli:' + this.index.toString()));
-            return this.resultDocument = document;
+            if (title.length === 0) {
+                this.index += 1;
+                title = this.index.toString();
+            }
+            return this.resultDocument = await workspace.openTextDocument(Uri.parse('azcli:' + title));
         }
         else
         {
-            const document_1 = await workspace.openTextDocument({ language: 'json' });
-            return this.resultDocument = document_1;
+            //const document_1 = await workspace.openTextDocument({ language: 'json' });
+            return this.resultDocument = await workspace.openTextDocument({ language: 'json' });
         }
     }
 
