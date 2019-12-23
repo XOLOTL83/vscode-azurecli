@@ -31,8 +31,6 @@ export function activate(context: ExtensionContext) {
 		}
 	}
     context.subscriptions.push(workspace.registerTextDocumentContentProvider(azCliScheme, azCliProvider));
-
-    //workspace.registerFileSystemProvider('gitfs', workspace., { isReadonly: true, isCaseSensitive: true })
 }
 
 const completionKinds: Record<CompletionKind, CompletionItemKind> = {
@@ -187,16 +185,13 @@ class RunLineInEditor {
     private run(source: TextEditor) {
         this.runningCommandCount += 1;
         const t0 = Date.now();
-        if (this.runningCommandCount === 1)
-        {
+        if (this.runningCommandCount === 1) {
             this.statusBarItemText = `Azure CLI: Waiting for response`;
             this.statusBarUpdateInterval = setInterval(() => {
-                if (this.runningCommandCount === 1)
-                {
+                if (this.runningCommandCount === 1) {
                     this.commandRunningStatusBarItem.text = `${this.statusBarItemText} ${this.statusBarSpinner()}`;
                 }
-                else
-                {
+                else {
                     this.commandRunningStatusBarItem.text = `${this.statusBarItemText} [${this.runningCommandCount}] ${this.statusBarSpinner()}`;
                 }
             }, 50);
@@ -228,8 +223,7 @@ class RunLineInEditor {
         this.statusBarItemText = 'Azure CLI: Executed in ' + (Date.now() - startTime) + ' milliseconds';
         this.commandRunningStatusBarItem.text = this.statusBarItemText;
 
-        if (this.runningCommandCount === 0)
-        {
+        if (this.runningCommandCount === 0) {
             clearInterval(this.statusBarUpdateInterval);
 
             // hide status bar item after 10 seconds to keep status bar uncluttered
@@ -252,17 +246,16 @@ class RunLineInEditor {
         }
 
         const openResultAsReadOnly = workspace.getConfiguration('azureCLI', null).get<boolean>('openResultAsReadOnly', false);
-        if (openResultAsReadOnly)
-        {
+        if (openResultAsReadOnly) {
             if (title.length === 0) {
                 this.index += 1;
                 title = this.index.toString();
             }
+
+            // can we set the "tab sizing" value??? (want tab sizing = shrink)
             return this.resultDocument = await workspace.openTextDocument(Uri.parse('azcli:' + title));
         }
-        else
-        {
-            //const document_1 = await workspace.openTextDocument({ language: 'json' });
+        else {
             return this.resultDocument = await workspace.openTextDocument({ language: 'json' });
         }
     }
