@@ -207,7 +207,7 @@ class RunLineInEditor {
 
             this.parsedResult = undefined;
             this.query = undefined; // TODO
-            return this.findResultDocument()
+            return this.findResultDocument(command)
                 .then(document => window.showTextDocument(document, ViewColumn.Two, true))
                 .then(target => replaceContent(target, JSON.stringify({ 'Running command': command }) + '\n')
                     .then(() => exec(command))
